@@ -38,7 +38,8 @@ func main() {
 	}
 	defer file.Close()
 
-	regex := regexp.MustCompile(`^(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+)$`)
+	secondAccuracyRegex := regexp.MustCompile(`^(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+)$`)
+	minuteAccuracyRegex := regexp.MustCompile(`^(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+)$`)
 
 	scanner := bufio.NewScanner(file)
 	// optionally, resize scanner's capacity for lines over 64K, see next example
@@ -46,14 +47,26 @@ func main() {
 		line := strings.Trim(scanner.Text(), " ")
 
 		if !strings.HasPrefix(line, "#") {
-			// TODO parse our crontab file and load it here. Be careful that here we have second accuracy here, but our crontab only has minute accuracy, so we need to add "0 " in front.
+			timing := ""
+			cmdToRun := ""
 
-			res := regex.FindAllStringSubmatch(line, -1)
-			for i := range res {
-				//fmt.Printf("year: %s, month: %s, day: %s\n", res[i][1], res[i][2], res[i][3])
-				timing := "0 " + res[i][1] + " " + res[i][2] + " " + res[i][3] + " " + res[i][4] + " " + res[i][5]
-				cmdToRun := res[i][7]
+			if secondAccuracyRegex.MatchString(line) {
+				resSec := secondAccuracyRegex.FindAllStringSubmatch(line, -1)
+				for i := range resSec {
+					//fmt.Printf("year: %s, month: %s, day: %s\n", res[i][1], res[i][2], res[i][3])
+					timing = resSec[i][1] + " " + resSec[i][2] + " " + resSec[i][3] + " " + resSec[i][4] + " " + resSec[i][5] + " " + resSec[i][6]
+					cmdToRun = resSec[i][8]
+				}
+			} else if minuteAccuracyRegex.MatchString(line) {
+				res := minuteAccuracyRegex.FindAllStringSubmatch(line, -1)
+				for i := range res {
+					//fmt.Printf("year: %s, month: %s, day: %s\n", res[i][1], res[i][2], res[i][3])
+					timing = "0 " + res[i][1] + " " + res[i][2] + " " + res[i][3] + " " + res[i][4] + " " + res[i][5]
+					cmdToRun = res[i][7]
+				}
+			}
 
+			if len(timing) > 0 && len(cmdToRun) > 0 {
 				// We don't need to change the stdout and stderr streams like cron does
 				cmdToRun = strings.ReplaceAll(cmdToRun, " > /proc/1/fd/1 2>/proc/1/fd/2", "")
 
@@ -95,6 +108,7 @@ func runShellCommand(bashCmd string) {
 	bashCmdFirstPart := parts[0]
 	args := parts[1:]
 
+	// TODO ENV vars are not interpreted. Example: "echo $HOME" will output this exactly.
 	cmd := exec.Command(bashCmdFirstPart, args...)
 	stdout, _ := cmd.StdoutPipe()
 	stderr, _ := cmd.StderrPipe()

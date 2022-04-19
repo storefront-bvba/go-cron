@@ -7,16 +7,23 @@ SHELL=/bin/bash
 BASH_ENV=/etc/environment
 
 # Example of job definition:
-# .---------------- minute (0 - 59)
-# |  .------------- hour (0 - 23)
-# |  |  .---------- day of month (1 - 31)
-# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
-# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
-# |  |  |  |  |
-# *  *  *  *  * username command to be executed
+# .---------------- second (0 - 59)
+# |  .---------------- minute (0 - 59)
+# |  |  .------------- hour (0 - 23)
+# |  |  |  .---------- day of month (1 - 31)
+# |  |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+# |  |  |  |  |  |
+# |  *  *  *  *  * username command to be executed
 
-* * * * * app date > /proc/1/fd/1 2>/proc/1/fd/2
-* * * * * root php test.php > /proc/1/fd/1 2>/proc/1/fd/2
+# Example with second level accuracy
+* * * * * * app date > /proc/1/fd/1 2>/proc/1/fd/2
+
+# Example with minute level accuracy and stdout + stderr output
+  * * * * * root php test.php > /proc/1/fd/1 2>/proc/1/fd/2
+
+# Example using ENV vars
+* * * * * * root echo $HOME > /proc/1/fd/1 2>/proc/1/fd/2
 
 # An empty line is required at the end of this file for a valid cron file.
 
