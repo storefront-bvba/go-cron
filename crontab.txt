@@ -20,10 +20,13 @@ BASH_ENV=/etc/environment
 * * * * * * app date > /proc/1/fd/1 2>/proc/1/fd/2
 
 # Example with minute level accuracy and stdout + stderr output
-  * * * * * root php test.php > /proc/1/fd/1 2>/proc/1/fd/2
+  * * * * * app date > /proc/1/fd/1 2>/proc/1/fd/2
+
+# Example with stdout + stderr output
+* * * * * * root php test.php > /proc/1/fd/1 2>/proc/1/fd/2
 
 # Example using ENV vars
 * * * * * * root echo $HOME > /proc/1/fd/1 2>/proc/1/fd/2
 
-# An empty line is required at the end of this file for a valid cron file.
-
+# Example with minute level accuracy and multiple spaces in the command
+* * * * * app /var/www/html/bin/magento cron:run > /proc/1/fd/1 2>/proc/1/fd/2

@@ -23,7 +23,7 @@ func init() {
 }
 
 var (
-	fileArg = flag.String("file", "", "file-name")
+	filePath = flag.String("file", "", "file-name")
 )
 
 func main() {
@@ -32,14 +32,17 @@ func main() {
 	c := cron.New()
 
 	// Read crontab file line by line
-	file, err := os.Open(*fileArg)
+	file, err := os.Open(*filePath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
 
-	secondAccuracyRegex := regexp.MustCompile(`^(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+)$`)
-	minuteAccuracyRegex := regexp.MustCompile(`^(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+)$`)
+	timeRegex := "[^a-zA-Z\\s]+?"
+	usernameRegex := "[a-zA-Z]+?"
+
+	secondAccuracyRegex := regexp.MustCompile("^(" + timeRegex + ")\\s+(" + timeRegex + ")\\s+(" + timeRegex + ")\\s+(" + timeRegex + ")\\s+(" + timeRegex + ")\\s+(" + timeRegex + ")\\s+(" + usernameRegex + ")\\s+(.+)$")
+	minuteAccuracyRegex := regexp.MustCompile("^(" + timeRegex + ")\\s+(" + timeRegex + ")\\s+(" + timeRegex + ")\\s+(" + timeRegex + ")\\s+(" + timeRegex + ")\\s+(" + usernameRegex + ")\\s+(.+)$")
 
 	scanner := bufio.NewScanner(file)
 	// optionally, resize scanner's capacity for lines over 64K, see next example
@@ -70,7 +73,10 @@ func main() {
 				// We don't need to change the stdout and stderr streams like cron does
 				cmdToRun = strings.ReplaceAll(cmdToRun, " > /proc/1/fd/1 2>/proc/1/fd/2", "")
 
-				c.AddFunc(timing, func() { runShellCommand(cmdToRun) })
+				error := c.AddFunc(timing, func() { runShellCommand(cmdToRun) })
+				if error != nil {
+					fmt.Fprintf(os.Stderr, "ERROR: "+error.Error()+"\n")
+				}
 			}
 
 		}
@@ -81,7 +87,7 @@ func main() {
 	}
 
 	// Start cron with one scheduled job
-	log.Info("Starting go-cron with " + strconv.Itoa(len(c.Entries())) + " jobs...")
+	log.Info("Starting go-cron with " + strconv.Itoa(len(c.Entries())) + " jobs loaded from " + *filePath + "...")
 	c.Start()
 	//printCronEntries(c.Entries())
 	//time.Sleep(2 * time.Minute)
