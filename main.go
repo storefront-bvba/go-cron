@@ -114,7 +114,7 @@ func runShellCommand(bashCmd string) {
 	bashCmdFirstPart := parts[0]
 	args := parts[1:]
 
-	// TODO ENV vars are not interpreted. Example: "echo $HOME" will output this exactly.
+	// TODO ENV vars are not interpreted. Example: "echo $HOME" will output this exactly. We also have a PHP CLI example and PHP also sees $_ENV as an empty array :(
 	cmd := exec.Command(bashCmdFirstPart, args...)
 	stdout, _ := cmd.StdoutPipe()
 	stderr, _ := cmd.StderrPipe()
