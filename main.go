@@ -120,6 +120,11 @@ func runShellCommand(bashCmd string) {
 	stdout, _ := cmd.StdoutPipe()
 	stderr, _ := cmd.StderrPipe()
 
+	cmd.Env = os.Environ()
+
+	// Add a custom ENV var
+	//cmd.Env = append(cmd.Env, "GO_CRON_WORKER=some_value")
+
 	cmd.Start()
 
 	stdoutScanner := bufio.NewScanner(stdout)
