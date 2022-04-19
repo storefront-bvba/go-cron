@@ -2,10 +2,14 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"github.com/robfig/cron"
 	log "github.com/sirupsen/logrus"
+	"os"
 	"os/exec"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -13,18 +17,58 @@ import (
 func init() {
 	log.SetLevel(log.InfoLevel)
 	log.SetFormatter(&log.TextFormatter{FullTimestamp: true})
+
+	// By default, the logger outputs to stderr, but this may not be ideal...
+	log.SetOutput(os.Stdout)
 }
 
+var (
+	fileArg = flag.String("file", "", "file-name")
+)
+
 func main() {
-	log.Info("Creating new cron...")
+	flag.Parse()
 
 	c := cron.New()
 
-	// TODO parse our crontab file and load it here. Be careful that here we have second accuracy, but our crontab only has minute accuracy
-	c.AddFunc("*/5 * * * *", func() { runShellCommand("date") })
+	// Read crontab file line by line
+	file, err := os.Open(*fileArg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	regex := regexp.MustCompile(`^(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+?)\s+(.+)$`)
+
+	scanner := bufio.NewScanner(file)
+	// optionally, resize scanner's capacity for lines over 64K, see next example
+	for scanner.Scan() {
+		line := strings.Trim(scanner.Text(), " ")
+
+		if !strings.HasPrefix(line, "#") {
+			// TODO parse our crontab file and load it here. Be careful that here we have second accuracy here, but our crontab only has minute accuracy, so we need to add "0 " in front.
+
+			res := regex.FindAllStringSubmatch(line, -1)
+			for i := range res {
+				//fmt.Printf("year: %s, month: %s, day: %s\n", res[i][1], res[i][2], res[i][3])
+				timing := "0 " + res[i][1] + " " + res[i][2] + " " + res[i][3] + " " + res[i][4] + " " + res[i][5]
+				cmdToRun := res[i][7]
+
+				// We don't need to change the stdout and stderr streams like cron does
+				cmdToRun = strings.ReplaceAll(cmdToRun, " > /proc/1/fd/1 2>/proc/1/fd/2", "")
+
+				c.AddFunc(timing, func() { runShellCommand(cmdToRun) })
+			}
+
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
 
 	// Start cron with one scheduled job
-	log.Info("Starting cron...")
+	log.Info("Starting go-cron with " + strconv.Itoa(len(c.Entries())) + " jobs...")
 	c.Start()
 	//printCronEntries(c.Entries())
 	//time.Sleep(2 * time.Minute)
@@ -34,48 +78,42 @@ func main() {
 		time.Sleep(time.Minute)
 	}
 
-	// Funcs may also be added to a running Cron
-	//log.Info("Add new job to a running cron")
-	//entryID2, _ := c.AddFunc("*/2 * * * *", func() { log.Info("[Job 2]Every two minutes job\n") })
-	//printCronEntries(c.Entries())
-	//time.Sleep(5 * time.Minute)
+	// Funcs can also be added while running
+	// log.Info("Add new job to a running cron")
+	// entryID2, _ := c.AddFunc("*/2 * * * *", func() { log.Info("[Job 2]Every two minutes job\n") })
+	// showCronEntries(c.Entries())
 
-	//Remove Job2 and add new Job2 that run every 1 minute
-	//log.Info("Remove Job2 and add new Job2 with schedule run every minute")
-	//c.Remove(entryID2)
-	//c.AddFunc("*/1 * * * *", func() { log.Info("[Job 2]Every one minute job\n") })
-	//time.Sleep(5 * time.Minute)
-
+	// Or funcs can be removed while running
+	// log.Info("Remove Job2 and add new Job2 with schedule run every minute")
+	// c.Remove(entryID2)
+	// c.AddFunc("*/1 * * * *", func() { log.Info("[Job 2]Every one minute job\n") })
 }
 
 func runShellCommand(bashCmd string) {
-	bashCmdFirstPart := "php"
-	args := "-v"
+	//fmt.Fprintf(os.Stdout, "Running: "+bashCmd+"\n")
+	parts := strings.Split(bashCmd, " ")
+	bashCmdFirstPart := parts[0]
+	args := parts[1:]
 
-	cmd := exec.Command(bashCmdFirstPart, strings.Split(args, " ")...)
-
-	// TODO What about std?
-	stderr, _ := cmd.StderrPipe()
+	cmd := exec.Command(bashCmdFirstPart, args...)
 	stdout, _ := cmd.StdoutPipe()
+	stderr, _ := cmd.StderrPipe()
 
 	cmd.Start()
 
-	// TODO is this the best way to pass the stderr output from the bash command out of this Go app?
-	scanner := bufio.NewScanner(stderr)
-	//scanner.Split(bufio.ScanWords)
-	for scanner.Scan() {
-		m := scanner.Text()
-		fmt.Println(m)
+	stdoutScanner := bufio.NewScanner(stdout)
+	stderrScanner := bufio.NewScanner(stderr)
+
+	for stdoutScanner.Scan() {
+		stdoutMessage := stdoutScanner.Text()
+		fmt.Fprintf(os.Stdout, stdoutMessage+"\n")
 	}
 
-	// TODO is this the best way to pass the stdout output from the bash command out of this Go app?
-	// TODO ideally, we want to differentiate stdout vs stderr output!
-	scanner2 := bufio.NewScanner(stdout)
-	//scanner2.Split(bufio.ScanWords)
-	for scanner2.Scan() {
-		m2 := scanner2.Text()
-		fmt.Println(m2)
+	for stderrScanner.Scan() {
+		stderrMessage := stderrScanner.Text()
+		fmt.Fprintf(os.Stderr, stderrMessage+"\n")
 	}
+
 	cmd.Wait()
 }
 
