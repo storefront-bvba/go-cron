@@ -15,3 +15,7 @@ The reason this app was created is specifically geared towards the use in a Dock
 ```
 ./go-cron -file crontab.txt
 ```
+Consider using `dumb-init` to prevent zombie processes. I'm not sure if it is needed, as my understanding of the init system is limited, but using `dumb-init` does not hurt either.
+```
+/usr/bin/dumb-init -- ./go-cron -file crontab.txt
+```
